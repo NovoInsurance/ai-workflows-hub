@@ -12,7 +12,8 @@
 | --- | --- | --- |
 | 1 条命令 / 约 1 分钟 | 约 20 分钟 | 每个新 Repo 独立接入 |
 
-流程分两部分：① 脚本自动复制所有文件；② AWS Role / GitHub App / Secrets / Actions 权限等需人工在控制台完成。其中 **AWS Role 需他人配置，建议第一时间发起**。
+> [!IMPORTANT]
+> **前置条件**：你需要对目标 repo 有 **admin 权限**（添加 Secrets、修改 Actions 设置、安装 GitHub App 都依赖它）。
 
 ---
 
@@ -49,14 +50,10 @@ bash /tmp/ai-workflows-hub/scripts/install.sh
 
 ### 步骤 2 · 申请 AWS Bedrock Role 权限
 
-首次接入时，只需联系相关团队把该 Role 的 OIDC 信任策略配置到你的 repo 即可（一次性操作）。
+**你要做的**：把 repo 全名 `YOUR_ORG/YOUR_REPO` 发给 **Build/Release team**（或邮件 `ktian@telenavsoftware.com`），请对方将其加入该 Role 的 OIDC 信任策略。一次性操作。
 
 > [!WARNING]
-> 此步骤依赖他人在 AWS 控制台配置，属于**异步等待项**。请**第一时间发起**，其余步骤（3~8）可并行进行，无需干等。在此 Role 配置好之前，workflow 无法调用 Bedrock。
-
-- 联系 **Build/Release team**，或邮件 `ktian@telenavsoftware.com`
-- 提供你的 repo 全名 `YOUR_ORG/YOUR_REPO`，用于加入 Role 的信任策略
-- 配置完成后，workflow 即可通过 GitHub OIDC assume 该 Role 调用 Bedrock
+> 此步骤需他人在 AWS 控制台配置，属**异步等待项**，请**第一时间发起**。等待期间可并行做步骤 3~8。
 
 ### 步骤 3 · 创建 GitHub App（Bot）
 
@@ -112,7 +109,7 @@ Generator / Evaluator 需要以 Actions 身份创建分支、开 PR，必须在 
 
 ### 步骤 6 · 替换占位符并填写内容
 
-脚本复制的文件里有几处占位符 / 占位内容需要按项目实际填写。
+按项目实际情况完成以下三处填写。
 
 **① 全局替换 `.github/workflows/pge-*.yml` 里的 bot 占位符**（出现在 plan / implement / evaluate 三个文件，值完全一致）：
 
@@ -121,16 +118,13 @@ Generator / Evaluator 需要以 Actions 身份创建分支、开 PR，必须在 
 | `YOUR_BOT_ID` | 步骤 3 查到的数字 user ID |
 | `your-app[bot]` | GitHub App bot username，如 `my-app-ci[bot]` |
 
-> [!NOTE]
-> `aws_role` 已预填共享 Bedrock Role，**无需替换**（其权限申请见步骤 2）。decompose / code-review 两个文件没有 bot 占位符，无需改动。
-
 **② 填写 `CLAUDE.md`** — 技术栈、架构约束、关键命令、SKILL 索引（AI agent 的"大脑"，越详细效果越好）
 
 **③ `.github/scripts/pge-verify.sh`** — 默认是输出成功的占位脚本，如果你有需求，可以改成你自己的校验脚本
 
 ### 步骤 7 · 导入 PGE 标签
 
-将 PGE 标签体系导入到目标 repo，后续所有 workflow 触发都依赖这些标签。此步骤依赖 `gh`（GitHub CLI）和 `ruby`，若本地尚未安装 `gh`，请先安装（macOS 自带 ruby），可用 `gh --version` 确认是否已安装。
+将 PGE 标签体系导入到目标 repo，后续所有 workflow 触发都依赖这些标签。此步骤依赖 `gh`（GitHub CLI）和 `ruby`（macOS 自带 ruby），安装与登录见下方命令。
 
 ```bash
 # 若未安装 gh，先安装（任选适合你系统的方式）
@@ -148,7 +142,7 @@ bash /tmp/ai-workflows-hub/scripts/import-labels.sh
 
 ### 步骤 8 · 提交到默认分支
 
-Reusable workflow 引用、Issue 模板、标签都必须在**默认分支**（main / master）上才会生效。
+Reusable workflow 引用和 Issue 模板都必须在**默认分支**（main / master）上才会生效（标签已在步骤 7 通过 API 创建，与分支无关）。
 
 - 提交脚本复制并填写好的全部文件
 - 推送到默认分支
@@ -159,6 +153,16 @@ git add .github .cursor CLAUDE.md
 git commit -m "chore: integrate ai-workflows-hub PGE"
 git push origin main
 ```
+
+### 步骤 9 · 试跑验证
+
+确认整条链路真正打通：
+
+- 打开 repo → **Issues → New issue**，用任一 PGE 模板建一个测试 Issue
+- 给它加标签 **`pge/status:ready`**
+- 打开 **Actions** 页，确认 Planner workflow 已被触发并成功运行
+
+跑通即代表接入成功；若 workflow 报错，多为步骤 2（Role 未配置好）、步骤 4（Secrets）或步骤 5（Actions 写权限）未完成。
 
 ---
 
@@ -177,7 +181,7 @@ git push origin main
 
 ---
 
-## 📌 demo repo 实际配置参考（tiankai0114/search-android-demo-app）
+## 📌 配置参考示例
 
 > 以下 4 项仅为一个示例，供参考。
 

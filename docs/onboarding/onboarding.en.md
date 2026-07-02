@@ -8,15 +8,22 @@
 
 `AWS Bedrock` · `GitHub Actions` · `Claude`
 
-| ⚡ File prep | 🔧 Manual cloud config | 🔁 Reusable |
-| --- | --- | --- |
-| 1 command / ~1 min | ~20 min | Onboard each new repo independently |
 
-The process has two parts: ① the script copies all files automatically; ② the AWS Role / GitHub App / Secrets / Actions permissions must be done manually in the consoles. The **AWS Role requires someone else to configure it, so kick it off first**.
+| ⚡ File prep        | 🔧 Manual cloud config | 🔁 Reusable                         |
+| ------------------ | ---------------------- | ----------------------------------- |
+| 1 command / ~1 min | ~20 min                | Onboard each new repo independently |
+
+
+> [!IMPORTANT]
+> **Prerequisite**: you need **admin access** to the target repo (adding Secrets, changing Actions settings, and installing the GitHub App all require it).
 
 ---
 
+
+
 ## 📦 Part 1 · One-Command File Prep (automated by script)
+
+
 
 ### Step 1 · Run the install script
 
@@ -45,18 +52,20 @@ The script prepares the following files automatically:
 
 ---
 
+
+
 ## 🔧 Part 2 · Cloud Configuration (manual)
+
+
 
 ### Step 2 · Request AWS Bedrock Role permissions
 
-For first-time onboarding, you only need to ask the relevant team to add your repo to the Role's OIDC trust policy (a one-time operation).
+**What to do**: send your full repo name `YOUR_ORG/YOUR_REPO` to the **Build/Release team** (or email `ktian@telenavsoftware.com`) and ask them to add it to the Role's OIDC trust policy. One-time operation.
 
 > [!WARNING]
-> This step depends on someone configuring it in the AWS console, so it is an **asynchronous, blocking item**. **Kick it off first**; the remaining steps (3~8) can proceed in parallel — no need to wait idly. Until this Role is configured, the workflows cannot call Bedrock.
+> This step must be configured by someone else in the AWS console — an **asynchronous, blocking item**, so **kick it off first**. While waiting, you can do steps 3~8 in parallel.
 
-- Contact the **Build/Release team**, or email `ktian@telenavsoftware.com`
-- Provide your full repo name `YOUR_ORG/YOUR_REPO` so it can be added to the Role's trust policy
-- Once configured, the workflows can assume the Role via GitHub OIDC to call Bedrock
+
 
 ### Step 3 · Create a GitHub App (Bot)
 
@@ -84,18 +93,24 @@ curl https://api.github.com/users/your-app-name%5Bbot%5D | grep '"id"'
 > [!NOTE]
 > Replace spaces in the App name with `-`, lowercase everything, and append the `[bot]` suffix to form the bot username.
 
+
+
 ### Step 4 · Add Secrets to the target repo
 
 Open the target repo → **Settings → Secrets and variables → Actions → New repository secret**
 
-| Secret | Value | Required |
-| --- | --- | --- |
-| `GH_APP_ID` | The GitHub App's numeric ID | **Required** (Implement / Evaluate) |
-| `GH_APP_PRIVATE_KEY` | Full contents of the `.pem` file (including the `-----BEGIN RSA PRIVATE KEY-----` header/footer lines) | **Required** (Implement / Evaluate) |
-| `FIGMA_TOKEN` | Figma Personal Access Token | Optional (when you have Figma designs) |
+
+| Secret               | Value                                                                                                  | Required                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| `GH_APP_ID`          | The GitHub App's numeric ID                                                                            | **Required** (Implement / Evaluate)    |
+| `GH_APP_PRIVATE_KEY` | Full contents of the `.pem` file (including the `-----BEGIN RSA PRIVATE KEY-----` header/footer lines) | **Required** (Implement / Evaluate)    |
+| `FIGMA_TOKEN`        | Figma Personal Access Token                                                                            | Optional (when you have Figma designs) |
+
 
 > [!NOTE]
 > Code Review, Decompose, and Plan only need the AWS Role ARN (written in the workflow); they do **not** need `GH_APP_ID` / `GH_APP_PRIVATE_KEY`.
+
+
 
 ### Step 5 · Enable Actions write permissions
 
@@ -110,27 +125,28 @@ Open the target repo → **Settings → Actions → General → Workflow permiss
 > [!IMPORTANT]
 > "Allow GitHub Actions to create and approve pull requests" is a repo-level switch. Even if the workflow declares `permissions`, it cannot override this, so this step must be enabled manually in the console.
 
+
+
 ### Step 6 · Replace placeholders and fill in content
 
-A few placeholders / placeholder content in the copied files need to be filled in per your project.
+Complete the following three fill-ins per your project.
 
-**① Globally replace the bot placeholders in `.github/workflows/pge-*.yml`** (they appear in the plan / implement / evaluate files, with identical values):
+**① Globally replace the bot placeholders in** `.github/workflows/pge-*.yml` (they appear in the plan / implement / evaluate files, with identical values):
 
-| Placeholder | Replace with |
-| --- | --- |
-| `YOUR_BOT_ID` | The numeric user ID from Step 3 |
+
+| Placeholder     | Replace with                                       |
+| --------------- | -------------------------------------------------- |
+| `YOUR_BOT_ID`   | The numeric user ID from Step 3                    |
 | `your-app[bot]` | The GitHub App bot username, e.g. `my-app-ci[bot]` |
 
-> [!NOTE]
-> `aws_role` is pre-filled with the shared Bedrock Role and **does not need to be replaced** (see Step 2 for its permission request). The decompose / code-review files have no bot placeholders and need no changes.
 
-**② Fill in `CLAUDE.md`** — tech stack, architecture constraints, key commands, SKILL index (the AI agent's "brain" — the more detail, the better).
+**② Fill in** `CLAUDE.md` — tech stack, architecture constraints, key commands, SKILL index (the AI agent's "brain" — the more detail, the better).
 
-**③ `.github/scripts/pge-verify.sh`** — a placeholder script that just prints success by default; if needed, replace it with your own verification script.
+**③** `.github/scripts/pge-verify.sh` — a placeholder script that just prints success by default; if needed, replace it with your own verification script.
 
 ### Step 7 · Import PGE labels
 
-Import the PGE label system into the target repo — every workflow trigger depends on these labels. This step requires `gh` (GitHub CLI) and `ruby`. If `gh` is not installed locally, install it first (macOS ships ruby). Use `gh --version` to check whether it is installed.
+Import the PGE label system into the target repo — every workflow trigger depends on these labels. This step requires `gh` (GitHub CLI) and `ruby` (macOS ships ruby); see the commands below for installation and login.
 
 ```bash
 # If gh is not installed, install it first (pick what fits your system)
@@ -146,9 +162,11 @@ gh auth login
 bash /tmp/ai-workflows-hub/scripts/import-labels.sh
 ```
 
+
+
 ### Step 8 · Commit to the default branch
 
-Reusable workflow references, Issue templates, and labels only take effect on the **default branch** (main / master).
+Reusable workflow references and Issue templates only take effect on the **default branch** (main / master) (labels were already created via the API in Step 7 and are branch-independent).
 
 - Commit all the files copied by the script and filled in
 - Push to the default branch
@@ -160,7 +178,21 @@ git commit -m "chore: integrate ai-workflows-hub PGE"
 git push origin main
 ```
 
+
+
+### Step 9 · Smoke test
+
+Confirm the whole chain actually works:
+
+- Open the repo → **Issues → New issue** and create a test Issue using any PGE template
+- Add the label `pge/status:ready`
+- Open the **Actions** page and confirm the Planner workflow was triggered and ran successfully
+
+A successful run means onboarding is complete. If the workflow errors out, it is usually because Step 2 (Role not configured), Step 4 (Secrets), or Step 5 (Actions write permissions) is incomplete.
+
 ---
+
+
 
 ## ✅ The Full Workflow After Onboarding
 
@@ -177,13 +209,18 @@ Create an Issue (using an Issue Template)
 
 ---
 
-## 📌 Demo Repo Reference Config (tiankai0114/search-android-demo-app)
+
+
+## 📌 Config Reference Example
 
 > The following 4 items are just an example, for reference.
 
-| Parameter | Value |
-| --- | --- |
-| `bot_name` | `ai-test-kai[bot]` |
-| `bot_id` | `290981734` |
-| GitHub App ID (`GH_APP_ID`) | `3969724` |
-| App name | `ai-test-kai` |
+
+| Parameter                   | Value              |
+| --------------------------- | ------------------ |
+| `bot_name`                  | `ai-test-kai[bot]` |
+| `bot_id`                    | `290981734`        |
+| GitHub App ID (`GH_APP_ID`) | `3969724`          |
+| App name                    | `ai-test-kai`      |
+
+
