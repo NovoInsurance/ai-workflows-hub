@@ -97,7 +97,7 @@ flowchart TD
 
 ```bash
 # 克隆 library
-git clone https://github.com/tiankai0114/ai-workflows-hub.git /tmp/ai-workflows-hub
+git clone https://github.com/NovoInsurance/ai-workflows-hub.git /tmp/ai-workflows-hub
 
 # 进入目标 repo 根目录并运行安装脚本
 cd /path/to/your-repo
@@ -272,7 +272,7 @@ jobs:
       !endsWith(github.event.pull_request.user.login, '[bot]') &&
       !contains(github.event.pull_request.title, '[Milestone') &&
       !endsWith(github.event.sender.login, '[bot]')
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
 ```
@@ -287,7 +287,7 @@ on:
 jobs:
   decompose:
     if: github.event.label.name == 'pge/status:decompose'
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-decompose.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-decompose.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
 ```
@@ -302,7 +302,7 @@ on:
 jobs:
   plan:
     if: github.event.label.name == 'pge/status:ready'
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-plan.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-plan.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       bot_id: "YOUR_BOT_ID"
@@ -325,7 +325,7 @@ jobs:
     if: |
       (github.event_name == 'issues' && github.event.label.name == 'pge/status:implement') ||
       (github.event_name == 'pull_request' && github.event.label.name == 'pge/pr:needs-rework')
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-implement.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-implement.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       bot_id: "YOUR_BOT_ID"
@@ -361,7 +361,7 @@ jobs:
       github.event_name == 'pull_request_review' &&
       github.event.review.state == 'changes_requested' &&
       endsWith(github.event.pull_request.user.login, '[bot]')
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       bot_id: "YOUR_BOT_ID"
@@ -376,7 +376,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'opened' && endsWith(github.event.pull_request.user.login, '[bot]')) ||
       (github.event.action == 'synchronize' && !endsWith(github.event.sender.login, '[bot]') && endsWith(github.event.pull_request.user.login, '[bot]'))
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       bot_id: "YOUR_BOT_ID"
@@ -392,7 +392,7 @@ jobs:
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true &&
       contains(github.event.pull_request.title, '[Milestone')
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       bot_id: "YOUR_BOT_ID"
@@ -419,7 +419,7 @@ on:
   workflow_dispatch:
 jobs:
   monitor:
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/cloudwatch-debug.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/cloudwatch-debug.yml@v1
     with:
       aws_role: "YOUR_ROLE_ARN"
       log_group: "/aws/lambda/your-function"

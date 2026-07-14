@@ -10,7 +10,7 @@ name: "CloudWatch Debug"
 #     workflow_dispatch:
 #   jobs:
 #     monitor:
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/cloudwatch-debug.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/cloudwatch-debug.yml@v1
 #       with:
 #         aws_role: "arn:aws:iam::ACCOUNT:role/your-cw-role"
 #         log_group: "/aws/lambda/your-function"
@@ -209,7 +209,7 @@ jobs:
       - name: Analyze logs with Claude
         id: analyze
         if: steps.fetch-logs.outputs.logs_available == 'true'
-        uses: tiankai0114/ai-workflows-hub/.github/actions/claude-bedrock@v1
+        uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
         env:
           ANALYSIS_CONTEXT: ${{ inputs.analysis_context }}
           LOG_GROUP: ${{ inputs.log_group }}
@@ -349,7 +349,7 @@ jobs:
           (inputs.handler == 'jira' || inputs.handler == 'both') &&
           inputs.jira_base_url != '' &&
           inputs.jira_project_key != ''
-        uses: tiankai0114/ai-workflows-hub/.github/actions/jira-handler@v1
+        uses: NovoInsurance/ai-workflows-hub/.github/actions/jira-handler@v1
         with:
           jira_base_url: ${{ inputs.jira_base_url }}
           jira_project_key: ${{ inputs.jira_project_key }}
@@ -368,7 +368,7 @@ jobs:
           steps.dedup.outputs.skip != 'true' &&
           (inputs.handler == 'teams' || inputs.handler == 'both') &&
           inputs.teams_webhook_url != ''
-        uses: tiankai0114/ai-workflows-hub/.github/actions/teams-handler@v1
+        uses: NovoInsurance/ai-workflows-hub/.github/actions/teams-handler@v1
         with:
           webhook_url: ${{ inputs.teams_webhook_url }}
           title: "CloudWatch Alert — ${{ steps.read-analysis.outputs.component }}"

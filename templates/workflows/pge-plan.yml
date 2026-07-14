@@ -23,7 +23,7 @@ permissions:
 jobs:
   plan:
     if: github.event.label.name == 'pge/status:ready'
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-plan.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-plan.yml@v1
     with:
       aws_role: "arn:aws:iam::759864781520:role/jenkins-actions-bedrock-pge"
       bot_id: "YOUR_BOT_ID"

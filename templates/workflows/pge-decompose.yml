@@ -24,6 +24,6 @@ permissions:
 jobs:
   decompose:
     if: github.event.label.name == 'pge/status:decompose'
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-decompose.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-decompose.yml@v1
     with:
       aws_role: "arn:aws:iam::759864781520:role/jenkins-actions-bedrock-pge"

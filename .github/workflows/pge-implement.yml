@@ -14,7 +14,7 @@ name: "PGE: Generator"
 #       if: |
 #         (github.event_name == 'issues' && github.event.label.name == 'pge/status:implement') ||
 #         (github.event_name == 'pull_request' && github.event.label.name == 'pge/pr:needs-rework')
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-implement.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-implement.yml@v1
 #       with:
 #         bot_name: "your-app[bot]"
 #         bot_id: "YOUR_BOT_ID"
@@ -206,7 +206,7 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: tiankai0114/ai-workflows-hub/.github/actions/claude-bedrock@v1
+      - uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           figma_token: ${{ steps.detect-figma.outputs.found == 'true' && secrets.figma_token || '' }}
@@ -463,7 +463,7 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: tiankai0114/ai-workflows-hub/.github/actions/claude-bedrock@v1
+      - uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           figma_token: ${{ steps.detect-figma.outputs.found == 'true' && secrets.figma_token || '' }}

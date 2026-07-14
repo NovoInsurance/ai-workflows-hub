@@ -19,7 +19,7 @@
 #
 # USAGE
 # -----
-#   git clone https://github.com/tiankai0114/ai-workflows-hub /tmp/ai-workflows-hub
+#   git clone https://github.com/NovoInsurance/ai-workflows-hub /tmp/ai-workflows-hub
 #   cd /path/to/your-repo
 #   bash /tmp/ai-workflows-hub/scripts/install.sh
 #

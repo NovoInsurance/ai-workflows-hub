@@ -28,7 +28,7 @@ jobs:
       !endsWith(github.event.pull_request.user.login, '[bot]') &&
       !contains(github.event.pull_request.title, '[Milestone') &&
       !endsWith(github.event.sender.login, '[bot]')
-    uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
+    uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
     with:
       aws_role: "arn:aws:iam::759864781520:role/jenkins-actions-bedrock-pge"
     secrets:

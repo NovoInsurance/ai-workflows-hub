@@ -11,7 +11,7 @@ name: "PGE: Code Review"
 #         !endsWith(github.event.pull_request.user.login, '[bot]') &&
 #         !contains(github.event.pull_request.title, '[Milestone') &&
 #         !endsWith(github.event.sender.login, '[bot]')
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
 #       with:
 
 on:
@@ -92,7 +92,7 @@ jobs:
 
 
       - name: Review PR
-        uses: tiankai0114/ai-workflows-hub/.github/actions/claude-bedrock@v1
+        uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
         with:
           github_token: ${{ github.token }}
           aws_role: ${{ inputs.aws_role }}

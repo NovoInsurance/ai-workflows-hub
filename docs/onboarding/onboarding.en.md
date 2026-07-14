@@ -31,7 +31,7 @@ From your target repo root, run the `install.sh` provided by the hub. It copies 
 
 ```bash
 # 1) Clone the hub into a temp directory
-git clone https://github.com/tiankai0114/ai-workflows-hub.git /tmp/ai-workflows-hub
+git clone https://github.com/NovoInsurance/ai-workflows-hub.git /tmp/ai-workflows-hub
 
 # 2) Go to your repo root and run the install script
 cd /path/to/your-repo

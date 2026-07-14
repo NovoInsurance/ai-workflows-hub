@@ -16,15 +16,15 @@ name: "PGE: Evaluator"
 #   jobs:
 #     human-rework:
 #       if: github.event_name == 'pull_request_review' && ...
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
 #       with: { mode: "human-rework", pr_number: ... }
 #     evaluate:
 #       if: github.event_name == 'workflow_dispatch' || ...
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
 #       with: { mode: "evaluate", pr_number: ... }
 #     milestone-advance:
 #       if: github.event.action == 'closed' && github.event.pull_request.merged == true && ...
-#       uses: tiankai0114/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
+#       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-evaluate.yml@v1
 #       with: { mode: "milestone-advance", pr_number: ... }
 
 on:
@@ -306,7 +306,7 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: tiankai0114/ai-workflows-hub/.github/actions/claude-bedrock@v1
+      - uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           figma_token: ${{ steps.detect-figma.outputs.found == 'true' && secrets.figma_token || '' }}

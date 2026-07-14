@@ -25,7 +25,7 @@
 
 ```bash
 # 1) 克隆 hub 到临时目录
-git clone https://github.com/tiankai0114/ai-workflows-hub.git /tmp/ai-workflows-hub
+git clone https://github.com/NovoInsurance/ai-workflows-hub.git /tmp/ai-workflows-hub
 
 # 2) 进入你的 repo 根目录，运行安装脚本
 cd /path/to/your-repo
