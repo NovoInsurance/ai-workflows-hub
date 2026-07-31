@@ -235,7 +235,9 @@ jobs:
               open questions. If the list is empty, write "None".
             - Stay high-level. Define WHAT, not HOW.
             - Do NOT create PRs or write code.
-            - Add appropriate `pge/scope:` and `pge/domain:` labels to the issue.
+            - Add appropriate `pge/scope:` label(s) to the issue (see CLAUDE.md for the
+              available scope labels). Also add `pge/domain:` label(s) if CLAUDE.md
+              defines that dimension for this project — otherwise skip it.
 
       - name: "Iteration 1: Check result"
         id: iter1-check
