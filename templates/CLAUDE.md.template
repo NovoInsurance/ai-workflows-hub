@@ -184,9 +184,19 @@ Every issue must have all three required label categories:
 | **Status** | `pge/status:triage` (always start here) |
 
 ### Available scope labels
-<!-- Update these to match your project's scope labels in .github/labels.yml -->
-- `pge/scope:[scope-1]`
-- `pge/scope:[scope-2]`
+<!-- .github/labels.yml ships with frontend/backend as a generic starting point.
+     Replace/extend these to match your project's real module boundaries
+     (e.g. per-repo, per-package, or per-directory scopes), and keep this list
+     in sync with .github/labels.yml. -->
+- `pge/scope:frontend`
+- `pge/scope:backend`
+
+### Domain labels (optional)
+<!-- pge/domain:* labels are NOT pre-defined in .github/labels.yml — this
+     dimension is optional. Only add it if your project benefits from a
+     second classification axis (e.g. business workflow area). If you use
+     it, list the available pge/domain:* labels here and add matching
+     entries to .github/labels.yml. Delete this subsection if unused. -->
 
 ---
 

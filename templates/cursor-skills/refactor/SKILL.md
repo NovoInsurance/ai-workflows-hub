@@ -44,8 +44,9 @@ The only sanctioned reasons to refactor:
 
 Every refactor follows the **Green → Refactor → Green** loop:
 
-1. **Green** — confirm the relevant tests (`yarn lint`, `npx vitest --run`, `yarn build`,
-   engine `yarn test`) all pass on the current code. If a behavior is uncovered, write a
+1. **Green** — confirm the relevant verification suite (lint, unit tests, build — see
+   each sub-project's `development-standard/SKILL.md` for the exact commands) all pass
+   on the current code. If a behavior is uncovered, write a
    *characterization test* first that pins down the existing behavior — even if the
    behavior is wrong (a separate PR will fix it).
 2. **Refactor** — apply ONE small step at a time (Extract Method, Inline Variable,
@@ -64,15 +65,15 @@ The catalog below lists techniques routinely safe inside this repo. For each, th
 |-----------|-------------|------------|
 | **Extract Function** | Function exceeds clean-code §2 thresholds; same expression appears twice | Existing unit tests + lint |
 | **Inline Function/Variable** | Indirection adds no clarity | Existing tests |
-| **Rename** | Name no longer reflects intent (clean-code §1) | Lint + tsc + tests + IDE rename across workspace |
-| **Move Function/File** | Function lives in the wrong layer / package | tsc + lint (paths) + tests |
+| **Rename** | Name no longer reflects intent (clean-code §1) | Lint + type-check/compile + tests + IDE rename across workspace |
+| **Move Function/File** | Function lives in the wrong layer / package | Type-check/compile + lint (paths) + tests |
 | **Replace Conditional with Polymorphism** | Long `switch`/`if-else` on a discriminator | Tests per branch |
 | **Replace Magic Number with Constant** | clean-code §4 violation | Tests + grep for the literal |
 | **Replace Loop with Pipeline** | Imperative loop doing map/filter/reduce | Tests |
 | **Split Phase** | A function mixes parsing + business logic | Tests per phase |
 | **Encapsulate Variable** | Mutable global / module-level state | Tests + grep for direct access |
-| **Replace Primitive with Object/Type** | A primitive carries domain meaning (e.g. `string` for `QuoteId`) | Tests + tsc strictness |
-| **Combine/Split Module** | Files exceed §7 size or have multiple unrelated responsibilities | tsc + lint + tests |
+| **Replace Primitive with Object/Type** | A primitive carries domain meaning (e.g. a raw string used as an entity ID) | Tests + static type checking (where the language supports it) |
+| **Combine/Split Module** | Files exceed §7 size or have multiple unrelated responsibilities | Type-check/compile + lint + tests |
 
 Avoid grand techniques (Strangler Fig, Branch by Abstraction) without a tracking
 issue and a Planner pass — they are multi-PR programs, not refactors.
@@ -106,7 +107,7 @@ Skipping this and bundling them is a Dimension G violation.
 ## 7. Cross-cutting Refactor Protocol
 
 When a refactor crosses package boundaries (e.g. renaming an export shared by
-agent and consumer), follow this protocol:
+two or more sub-projects), follow this protocol:
 
 1. **Plan**: open or update a tracking issue. List every consumer.
 2. **Add the new symbol** alongside the old. Mark the old as `@deprecated` with the
@@ -135,11 +136,11 @@ used inside the same package (verify with workspace-wide grep).
 - Observable behavior of <feature> is unchanged
 
 ## Verification
-- [ ] `yarn lint` clean
-- [ ] `yarn build` green
-- [ ] `npx vitest --run` (agent / consumer) green
-- [ ] `yarn test` (engine) green
-- [ ] Storybook builds (UI components only)
+- [ ] Lint clean (all affected sub-projects)
+- [ ] Build green (all affected sub-projects)
+- [ ] Unit/integration tests green (all affected sub-projects — see each
+      `development-standard/SKILL.md` for the exact commands)
+- [ ] UI component library builds/renders correctly (if applicable)
 - [ ] No new SKILL update required (cite reason) OR list updated SKILLs
 ```
 

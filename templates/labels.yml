@@ -99,60 +99,23 @@
   color: "1D76DB"
   description: "Triggers E2E Generator to explore changed ui-flows and sediment Playwright specs"
 
-# --- pge/scope: Which repos are affected (name = directory without novo- prefix) ---
-- name: "pge/scope:portal-agent"
+# --- pge/scope: Which part of the codebase is affected (customize per project) ---
+# These are just a generic starting point. Add/rename/remove scope labels here
+# (and update CLAUDE.md's "Available scope labels" section to match) once you
+# know your project's real module boundaries — e.g. per-repo, per-package, or
+# per-directory scopes instead of frontend/backend.
+- name: "pge/scope:frontend"
   color: "C2E0C6"
-  description: "Affects novo-portal-agent (agent portal)"
-- name: "pge/scope:quote-engine"
+  description: "Affects frontend / UI code"
+- name: "pge/scope:backend"
   color: "BFDADC"
-  description: "Affects novo-quote-engine (backend API)"
-- name: "pge/scope:portal-consumer"
-  color: "D4C5F9"
-  description: "Affects novo-portal-consumer (customer portal)"
-- name: "pge/scope:portal-ui-components"
-  color: "E6D8F0"
-  description: "Affects shared UI (novo-portal-ui-components)"
-- name: "pge/scope:portal-libs-analytics"
-  color: "BFDADC"
-  description: "Affects shared analytics SDK (novo-portal-libs-analytics)"
-- name: "pge/scope:portal-libs-logging"
-  color: "BFDADC"
-  description: "Affects shared logging SDK (novo-portal-libs-logging)"
+  description: "Affects backend / API code"
 
-# --- pge/domain: Which quote workflow area ---
-- name: "pge/domain:client-info"
-  color: "E6E6E6"
-  description: "Client info / initial info step"
-- name: "pge/domain:drivers"
-  color: "E6E6E6"
-  description: "Drivers step"
-- name: "pge/domain:vehicles"
-  color: "E6E6E6"
-  description: "Vehicles step"
-- name: "pge/domain:incidents"
-  color: "E6E6E6"
-  description: "Incidents step"
-- name: "pge/domain:coverage"
-  color: "E6E6E6"
-  description: "Coverage & pricing step"
-- name: "pge/domain:payment"
-  color: "E6E6E6"
-  description: "Payment step"
-- name: "pge/domain:e-signature"
-  color: "E6E6E6"
-  description: "E-signature step"
-- name: "pge/domain:underwriting"
-  color: "E6E6E6"
-  description: "Underwriting step"
-- name: "pge/domain:reports"
-  color: "E6E6E6"
-  description: "Reports / MVR reports step"
-- name: "pge/domain:quote"
-  color: "E6E6E6"
-  description: "Quote lifecycle (backend)"
-- name: "pge/domain:risk-check"
-  color: "E6E6E6"
-  description: "Risk check / Verisk / Equifax"
+# NOTE: pge/domain (business-workflow-area) labels are intentionally NOT
+# pre-defined here — that dimension is optional and highly project-specific.
+# If your project needs it, define your own pge/domain:* labels below and
+# document them in CLAUDE.md; the Planner reads CLAUDE.md, not this file,
+# to decide which labels to apply.
 
 # --- pge/priority ---
 - name: "pge/P0"

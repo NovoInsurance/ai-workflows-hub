@@ -30,7 +30,7 @@ flaky, untrustworthy, or coupled to implementation details is worse than no test
 
 - **AAA layout** — Arrange, Act, Assert, visually separated.
 - **One behavior per test** — multiple `expect`s are fine only if they describe the same behavior.
-- **Behavioral names** — `it("returns 404 when the quote does not exist")`, not `it("test getQuote")`.
+- **Behavioral names** — `it("returns 404 when the resource does not exist")`, not `it("test getResource")`.
 - **No conditional logic in tests** — no `if`/`for`/`try` deciding what to assert; that's a sign the test should be split or parameterized.
 - **Test behavior, not implementation** — assert on observable outputs/effects, not private internals or call counts of internal helpers. Refactors must not break correct tests.
 - **Cover the edges** — empty, null/undefined, boundary values, error paths — not just the happy path.

@@ -27,7 +27,7 @@ this skill is binding.
 | **Booleans read as predicates** | `isActive`, `hasPaid`, `canEdit`, `shouldRetry`. Never `flag`, `status` (for boolean), `active` (without is/has). |
 | **Verbs for functions, nouns for values** | `calculateTotal()`, not `total()`. `fetchedQuote`, not `getQuote` (the variable). |
 | **Searchable names** | If it appears in business logic, it must be greppable (`MAX_RETRY_COUNT`, not `3`). |
-| **Avoid encodings** | No Hungarian (`strName`), no `I` prefix on TS interfaces **except** NestJS service interfaces (see engine `development-standard`). |
+| **Avoid encodings** | No Hungarian (`strName`), no type-prefix conventions unless a sub-project's `development-standard/SKILL.md` explicitly requires one for its framework. |
 
 ## 2. Functions
 
@@ -39,7 +39,7 @@ this skill is binding.
 | **Nesting depth** | ≤ 3 levels of `if` / `for` / `try`. Use early-return guard clauses. |
 | **Single level of abstraction** | A function either orchestrates other functions or does work — not both. |
 | **No flag arguments** | `doThing(true)` — split into `doThing()` and `doThingWithSideEffect()`. |
-| **No mutating arguments** | Treat all parameters as `readonly`. Return a new value instead. Exception: explicit out-parameters in performance-critical engine code (must be commented). |
+| **No mutating arguments** | Treat all parameters as immutable/`readonly`. Return a new value instead. Exception: explicit out-parameters in performance-critical code (must be commented). |
 | **Pure where possible** | Side-effects (network, disk, time, randomness, logging) should be isolated to dedicated functions / methods. |
 
 ## 3. Comments
@@ -57,7 +57,7 @@ this skill is binding.
 ## 4. Complexity & Duplication
 
 - **Rule of three** — duplicate twice, extract on the third occurrence. Don't pre-abstract.
-- **No magic numbers / strings** — extract to a `const` (in the engine, an `enum`).
+- **No magic numbers / strings** — extract to a named constant (or an enum-like construct where the language supports it).
 - **No dead code** — delete commented-out code, unreachable branches, unused exports.
 - **No `console.*` in production code paths** — use the project logger (`logger`, `this.logInfo`, etc.).
 - **Avoid premature optimization** — write the clear version first; optimize only with a measured baseline.
@@ -65,7 +65,7 @@ this skill is binding.
 ## 5. Error Handling
 
 - **Never swallow errors** — every `catch` must log via the project logger, re-throw, or convert to a typed error.
-- **No bare `throw new Error("…")`** — use a project-typed error (`ApiError` in engine, mapped to `Response`/Zod issue in BFF).
+- **No bare/generic exceptions** — use a project-typed error class, mapped consistently to the API response/error envelope at the boundary (see each sub-project's `development-standard/SKILL.md`).
 - **Catch only what you can handle** — narrow the scope of `try` blocks. Don't wrap entire functions in `try`.
 - **No `error: any` outside the catch binding** — see each sub-project's `development-standard/SKILL.md`.
 - **Errors must include enough context** to diagnose without re-running the request (request id, key parameters, error code, upstream status).
@@ -75,19 +75,19 @@ this skill is binding.
 
 - **No floating promises** — every promise is `await`ed, returned, or attached to `.catch()`. ESLint rule `@typescript-eslint/no-floating-promises` must pass.
 - **No `await` inside `for` loops over independent items** — use `Promise.all` / `Promise.allSettled` (with concurrency cap if the upstream rate-limits).
-- **Cancellation** — long-running BFF / engine work must respect the abort signal of the inbound request.
+- **Cancellation** — long-running server-side work must respect the abort/cancellation signal of the inbound request.
 - **Idempotency** — any retried operation (write to upstream / payment / DB) must carry an idempotency key.
 
 ## 7. Boundaries & Dependencies
 
 - **Inward dependency rule** — UI → server-side / BFF → API client → upstream. Reverse imports are forbidden.
-- **No `..` climbing past the package root** — use the workspace alias (`@/`, `@novo/...`).
+- **No `..` climbing past the package root** — use the workspace alias (e.g. `@/`, `@your-org/...`).
 - **No circular imports** — break the cycle by extracting the shared piece into a leaf module.
 - **One responsibility per file** — > 300 LOC of unrelated exports → split.
 
 ## 8. TypeScript Hygiene
 
-- **No `any`** — see each sub-project's `development-standard/SKILL.md` for the only allowed exception (catch binding in the engine).
+- **No `any`** — see each sub-project's `development-standard/SKILL.md` for any narrowly-scoped allowed exceptions (e.g. a catch binding).
 - **No `as` casts** unless paired with a runtime guard (Zod `.parse` / `class-validator` / `instanceof`).
 - **No non-null assertion `!`** unless control-flow guarantees non-null on the same screen of code (preferred: optional chaining + fallback).
 - **Discriminated unions over boolean flags** — `type Result = { kind: 'ok'; value: T } | { kind: 'err'; error: E }`.
@@ -99,7 +99,7 @@ this skill is binding.
 - **AAA layout** — Arrange, Act, Assert. Visually separated.
 - **One behavior per test** — multiple `expect`s OK if they describe the same behavior.
 - **No conditional assertions** — `if (cond) expect(...)` is a smell; split the test.
-- **Test names describe behavior** — `it("returns 404 when quote is not found")`, not `it("test getQuote")`.
+- **Test names describe behavior** — `it("returns 404 when the resource is not found")`, not `it("test getResource")`.
 - **No shared mutable state** between tests — `beforeEach` resets fixtures.
 - **Avoid mocking the system under test** — mock only external collaborators.
 - **Snapshot tests sparingly** — only for stable structural output, never for prose.
@@ -120,17 +120,12 @@ this skill is binding.
 - [ ] No `any`, no unguarded `as`, no `!` (§8)
 - [ ] Every error path logs with context (§5)
 - [ ] No drive-by refactors mixed with feature changes (§10)
-- [ ] `yarn lint` clean, build green, tests green
+- [ ] Lint clean, build green, tests green
 - [ ] Touched layers reflected in their `development-standard/SKILL.md` if a new pattern was introduced
 
 ## See Also
 
 - `/.cursor/skills/refactor/SKILL.md` — when and how to refactor (companion baseline)
 - Each sub-project's `development-standard/SKILL.md` for layer-specific rules:
-  - `novo-portal-agent/.cursor/skills/development-standard/SKILL.md`
-  - `novo-portal-agent/.cursor/skills/app-agent-portal/server/development-standard/SKILL.md`
-  - `novo-portal-consumer/.cursor/skills/development-standard/SKILL.md`
-  - `novo-quote-engine/.cursor/skills/development-standard/SKILL.md`
-  - `novo-portal-ui-components/.cursor/skills/development-standard/SKILL.md`
-  - `novo-portal-libs-analytics/.cursor/skills/development-standard/SKILL.md`
-  - `novo-portal-libs-logging/.cursor/skills/development-standard/SKILL.md`
+  <!-- List your project's sub-project SKILL paths here, one per affected module/repo, e.g.: -->
+  <!-- - `<sub-project>/.cursor/skills/development-standard/SKILL.md` -->
