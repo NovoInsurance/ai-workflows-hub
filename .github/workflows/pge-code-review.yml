@@ -13,6 +13,8 @@ name: "PGE: Code Review"
 #         !endsWith(github.event.sender.login, '[bot]')
 #       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
 #       with:
+#         aws_role: "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+#         # max_turns: '100'   # optional override, defaults to '60' if omitted
 
 on:
   workflow_call:
@@ -32,6 +34,14 @@ on:
         required: false
         type: string
         default: 'us.anthropic.claude-sonnet-4-6'
+      max_turns:
+        description: >
+          Maximum number of agentic turns for the review. Default (60) covers
+          most PRs. Override with a higher value (e.g. '100') for repos with
+          large/complex PRs that hit "Reached maximum number of turns" errors.
+        required: false
+        type: string
+        default: '60'
 
       aws_role:
         description: 'IAM Role ARN for Bedrock access'
@@ -100,7 +110,7 @@ jobs:
           bot_id: ${{ inputs.bot_id }}
           bot_name: ${{ inputs.bot_name }}
           model: ${{ inputs.model }}
-          max_turns: '30'
+          max_turns: ${{ inputs.max_turns }}
           show_full_output: 'true'
           prompt: |
             ${{ inputs.project_context != '' && format('## Project Context (provided by repo owner)\n\n{0}\n\n---\n\n', inputs.project_context) || '' }}You are a **Code Reviewer** for this project.

@@ -10,6 +10,8 @@ name: "PGE: Code Review"
 #  team or ktian@telenavsoftware.com.)
 # Project context (tech stack, review focus) lives in CLAUDE.md, read automatically.
 # FIGMA_TOKEN secret is optional (only needed for Figma design context).
+# max_turns defaults to 60 if omitted. If large/complex PRs hit
+# "Reached maximum number of turns" errors, uncomment and raise it below.
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -31,5 +33,6 @@ jobs:
     uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
     with:
       aws_role: "arn:aws:iam::759864781520:role/jenkins-actions-bedrock-pge"
+      # max_turns: '100'   # optional override, defaults to '60' if omitted
     secrets:
       figma_token: ${{ secrets.FIGMA_TOKEN }}
