@@ -469,8 +469,14 @@ jobs:
                - 🔄 CHANGES REQUESTED → add `pge/pr:needs-rework`
                - ❌ REJECT → add `pge/pr:rejected`
 
+      # Submits a review using github.token so github-actions[bot] appears in the Reviewers sidebar.
+      # `continue-on-error: true` is load-bearing: GitHub rejects any `event: 'APPROVE'` review
+      # submitted with GITHUB_TOKEN ("GitHub Actions is not permitted to approve pull requests").
+      # Without continue-on-error, the job fails and "Notify ready to merge + pipeline next milestone"
+      # is skipped — breaking Milestone N+1 auto-pipelining (observed: canary PR #94, novo-quote-ai #2359).
       - name: Submit formal GitHub review
         if: steps.pr.outputs.head_ref != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -496,9 +502,39 @@ jobs:
                        : needsRework ? '🔄 Evaluator requested changes.'
                        : rejected ? '❌ Evaluator rejected this PR.'
                        : '📋 Evaluation complete.';
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber, event, body,
-            });
+
+            // Dismiss prior CHANGES_REQUESTED from github-actions[bot] when the new verdict is not
+            // REQUEST_CHANGES. Stale bot change-requests block merge even after human approval
+            // (dismiss_stale_reviews_on_push only clears stale APPROVALS, not CHANGES_REQUESTED).
+            if (event !== 'REQUEST_CHANGES') {
+              const { data: existingReviews } = await github.rest.pulls.listReviews({
+                owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber,
+              });
+              const staleChangesRequested = existingReviews.filter(
+                r => r.user?.login === 'github-actions[bot]' && r.state === 'CHANGES_REQUESTED'
+              );
+              for (const stale of staleChangesRequested) {
+                try {
+                  await github.rest.pulls.dismissReview({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    pull_number: prNumber, review_id: stale.id,
+                    message: 'Superseded by a newer Evaluator run — see the latest review/label for the current verdict.',
+                  });
+                } catch (err) {
+                  console.log(`dismissReview(${stale.id}) failed: ${err.message}`);
+                }
+              }
+            }
+
+            try {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber, event, body,
+              });
+            } catch (err) {
+              // Expected for event === 'APPROVE' — GITHUB_TOKEN cannot submit APPROVE reviews.
+              // The real verdict is the pge/pr:* label; this review is a sidebar badge only.
+              console.log(`createReview(${event}) failed (expected for APPROVE via GITHUB_TOKEN): ${err.message}`);
+            }
 
       - name: Notify ready to merge + pipeline next milestone
         if: steps.push-mode.outputs.human_push != 'true'
