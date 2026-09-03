@@ -10,8 +10,24 @@ name: "PGE: Code Review"
 #  team or ktian@telenavsoftware.com.)
 # Project context (tech stack, review focus) lives in CLAUDE.md, read automatically.
 # FIGMA_TOKEN secret is optional (only needed for Figma design context).
-# max_turns defaults to 60 if omitted. If large/complex PRs hit
-# "Reached maximum number of turns" errors, uncomment and raise it below.
+# max_turns defaults to 100 if omitted — it is a ceiling, not a budget, so a
+# small PR still finishes in ~20 turns. Raise it below only if very large PRs
+# still hit "Reached maximum number of turns" (that error aborts the run and
+# posts no review at all).
+#
+# The review runs against a versioned rule set shipped by the hub, and each rule
+# gets an explicit PASS/FAIL/N-A verdict. Findings persist in a hidden comment on
+# the PR, so later pushes reconcile them instead of re-reviewing from scratch.
+# All of that works with the defaults below — nothing to configure.
+#
+# Optional knobs (all default to the safe/advisory behaviour):
+#   review_rules: 'false'      # fall back to the old free-form review
+#   verify_mode: 'block'       # also gate the review on .github/scripts/pge-verify.sh
+#   fail_on_must_fix: 'true'   # fail the check when must-fix findings remain
+#   max_review_rounds: '3'     # after this round, no new should-fix findings
+#
+# To add project rules on top of the hub baseline, drop Markdown files in
+# .github/review-rules/ using the same `### PRJ-01 — title` heading format.
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -33,6 +49,6 @@ jobs:
     uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
     with:
       aws_role: "arn:aws:iam::759864781520:role/jenkins-actions-bedrock-pge"
-      # max_turns: '100'   # optional override, defaults to '60' if omitted
+      # max_turns: '150'   # optional override, defaults to '100' if omitted
     secrets:
       figma_token: ${{ secrets.FIGMA_TOKEN }}

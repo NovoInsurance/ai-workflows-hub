@@ -1,0 +1,156 @@
+name: 'PGE Review Rules'
+description: >
+  Resolve the deterministic review rule set for a PR and write it to a file for
+  the reviewing agent to read. Which rule sets apply is decided by this action
+  from the changed paths — never by the model — so the same diff always gets the
+  same checklist.
+
+  Delivery note: this action lives in ai-workflows-hub, and the runner unpacks the
+  whole hub repo into _actions/ when the action is resolved. That means rules/ is
+  on disk without any cross-repo checkout or extra token, even though the calling
+  workflow's workspace holds the consumer repo.
+
+inputs:
+  changed_paths:
+    description: 'Newline-separated list of files changed in the PR'
+    required: true
+  extra_rules_dir:
+    description: >
+      Directory in the CONSUMER repo holding additional project rules (*.md).
+      Loaded after the hub baseline so projects can add stricter rules.
+      Silently skipped when the directory does not exist.
+    required: false
+    default: '.github/review-rules'
+
+outputs:
+  rules_file:
+    description: 'Absolute path to the generated rule set Markdown file'
+    value: ${{ steps.build.outputs.rules_file }}
+  rule_ids:
+    description: 'Comma-separated list of every rule ID in scope for this PR'
+    value: ${{ steps.build.outputs.rule_ids }}
+  rule_count:
+    description: 'Number of rules in scope'
+    value: ${{ steps.build.outputs.rule_count }}
+  rule_sets:
+    description: 'Comma-separated list of the rule set files that were selected'
+    value: ${{ steps.build.outputs.rule_sets }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build rule set
+      id: build
+      shell: bash
+      env:
+        CHANGED_PATHS: ${{ inputs.changed_paths }}
+        EXTRA_RULES_DIR: ${{ inputs.extra_rules_dir }}
+      run: |
+        set -euo pipefail
+
+        command -v jq >/dev/null 2>&1 || { echo "::error::jq is required but not found."; exit 1; }
+
+        action_dir="${GITHUB_ACTION_PATH}"
+        manifest="${action_dir}/manifest.json"
+        out_dir="${RUNNER_TEMP}/pge-review"
+        rules_file="${out_dir}/rules.md"
+        paths_file="${out_dir}/changed-paths.txt"
+
+        if [ ! -f "${manifest}" ]; then
+          echo "::error::Rule manifest not found at ${manifest}"
+          exit 1
+        fi
+
+        mkdir -p "${out_dir}"
+        printf '%s\n' "${CHANGED_PATHS}" | grep -v '^$' > "${paths_file}" || true
+
+        {
+          echo "# PGE Review Rule Set"
+          echo
+          echo "This is the **authoritative, closed checklist** for this review run."
+          echo "Every rule below carries a stable ID and MUST receive an explicit verdict"
+          echo "(PASS / FAIL / N-A). Do not invent rules that are not listed here."
+          echo
+          echo "Severity meaning:"
+          echo "- \`must-fix\` — correctness, security, or architecture violation; blocks merge."
+          echo "- \`should-fix\` — real quality issue; does not block merge."
+          echo
+        } > "${rules_file}"
+
+        # Read fields one at a time: @tsv would escape the backslashes in the
+        # regexes and silently break every extension matcher.
+        set_count="$(jq '.rule_sets | length' "${manifest}")"
+        selected=()
+        for i in $(seq 0 $((set_count - 1))); do
+          rule_file="$(jq -r ".rule_sets[${i}].file" "${manifest}")"
+          matcher="$(jq -r ".rule_sets[${i}].match" "${manifest}")"
+          [ -n "${rule_file}" ] || continue
+          if [ "${matcher}" = "always" ]; then
+            selected+=("${rule_file}")
+          elif grep -qE "${matcher}" "${paths_file}"; then
+            selected+=("${rule_file}")
+          fi
+        done
+
+        if [ "${#selected[@]}" -gt 0 ]; then
+          for rule_file in "${selected[@]}"; do
+            if [ -f "${action_dir}/rules/${rule_file}" ]; then
+              cat "${action_dir}/rules/${rule_file}" >> "${rules_file}"
+              printf '\n' >> "${rules_file}"
+            else
+              echo "::warning::Rule set listed in manifest but missing on disk: ${rule_file}"
+            fi
+          done
+        fi
+
+        # Consumer-supplied rules are additive and may only tighten the baseline.
+        if [ -d "${EXTRA_RULES_DIR}" ]; then
+          extra_header_written=0
+          while IFS= read -r extra_file; do
+            [ -n "${extra_file}" ] || continue
+            if [ "${extra_header_written}" -eq 0 ]; then
+              {
+                echo "---"
+                echo
+                echo "## Project-specific rules (from this repository)"
+                echo
+                echo "These are additive. They may tighten the baseline above, never relax it."
+                echo
+              } >> "${rules_file}"
+              extra_header_written=1
+            fi
+            cat "${extra_file}" >> "${rules_file}"
+            printf '\n' >> "${rules_file}"
+            selected+=("${EXTRA_RULES_DIR}/$(basename "${extra_file}")")
+          done < <(find "${EXTRA_RULES_DIR}" -maxdepth 1 -type f -name '*.md' | sort)
+        fi
+
+        rule_ids="$(grep -oE '^### [A-Z]+-[0-9]+' "${rules_file}" | sed 's/^### //' | paste -sd, - || true)"
+        rule_count=0
+        if [ -n "${rule_ids}" ]; then
+          rule_count="$(printf '%s' "${rule_ids}" | tr ',' '\n' | wc -l | tr -d ' ')"
+        fi
+
+        rule_sets=""
+        if [ "${#selected[@]}" -gt 0 ]; then
+          rule_sets="$(printf '%s\n' "${selected[@]}" | paste -sd, -)"
+        fi
+
+        {
+          echo "rules_file=${rules_file}"
+          echo "rule_ids=${rule_ids}"
+          echo "rule_count=${rule_count}"
+          echo "rule_sets=${rule_sets}"
+        } >> "${GITHUB_OUTPUT}"
+
+        {
+          echo "### PGE review rule set"
+          echo
+          echo "- Changed files: $(wc -l < "${paths_file}" | tr -d ' ')"
+          echo "- Rule sets selected: \`${rule_sets:-none}\`"
+          echo "- Rules in scope: **${rule_count}**"
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+        if [ "${rule_count}" -eq 0 ]; then
+          echo "::warning::No review rules resolved — the agent will fall back to general best practices."
+        fi

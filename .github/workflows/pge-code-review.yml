@@ -1,6 +1,15 @@
 name: "PGE: Code Review"
 
 # Reusable workflow — review human-authored PRs with Claude.
+#
+# The review is deterministic-first: a closed, versioned rule set (resolved from
+# the changed paths by .github/actions/review-rules) plus the consumer's optional
+# pge-verify.sh carry the checks that can be mechanised. The agent's job is the
+# judgement that tooling cannot do, reported rule by rule.
+#
+# Findings are persisted in a hidden marker comment on the PR, so each subsequent
+# push reconciles the previous findings instead of re-reviewing from scratch.
+#
 # Consumer trigger example:
 #   on:
 #     pull_request:
@@ -14,7 +23,7 @@ name: "PGE: Code Review"
 #       uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
 #       with:
 #         aws_role: "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
-#         # max_turns: '100'   # optional override, defaults to '60' if omitted
+#         # max_turns: '150'   # optional override, defaults to '100' if omitted
 
 on:
   workflow_call:
@@ -36,12 +45,14 @@ on:
         default: 'us.anthropic.claude-sonnet-4-6'
       max_turns:
         description: >
-          Maximum number of agentic turns for the review. Default (60) covers
-          most PRs. Override with a higher value (e.g. '100') for repos with
-          large/complex PRs that hit "Reached maximum number of turns" errors.
+          Ceiling on agentic turns for the review — not a budget. A small PR
+          finishes in ~20 turns regardless, so a generous ceiling costs nothing
+          and avoids the worst failure mode: hitting the limit aborts the run
+          with no review comment at all. Raise it further for repos with very
+          large PRs; timeout-minutes is the real backstop against runaway runs.
         required: false
         type: string
-        default: '60'
+        default: '100'
 
       aws_role:
         description: 'IAM Role ARN for Bedrock access'
@@ -63,6 +74,44 @@ on:
         type: string
         default: ''
 
+      review_rules:
+        description: >
+          Load the hub's versioned rule set (architecture / quality / security,
+          plus backend / frontend / testing when the changed paths match) and
+          require an explicit verdict per rule ID. Set to 'false' to fall back
+          to the previous free-form review.
+          A consumer repo may add stricter project rules in .github/review-rules/*.md.
+        required: false
+        type: string
+        default: 'true'
+      verify_mode:
+        description: >
+          What to do with the consumer's optional .github/scripts/pge-verify.sh:
+            report — run it and pass the result to the reviewer (default)
+            block  — additionally fail the job and skip the review when it fails
+            off    — do not run it at all
+          Default is 'report' so repos that already ship the script for the
+          Evaluator do not suddenly get a new merge gate.
+        required: false
+        type: string
+        default: 'report'
+      fail_on_must_fix:
+        description: >
+          Fail the job when the review ends with unresolved must-fix findings.
+          Defaults to 'false' (advisory review). Set to 'true' — and mark the
+          check as required in branch protection — to make it a merge gate.
+        required: false
+        type: string
+        default: 'false'
+      max_review_rounds:
+        description: >
+          Soft cap on review rounds per PR. From this round onwards the reviewer
+          stops raising new should-fix findings and only re-verifies open
+          must-fix ones, so the fix/review loop terminates.
+        required: false
+        type: string
+        default: '3'
+
     secrets:
       figma_token:
         description: 'Figma Personal Access Token (optional, enables design context)'
@@ -77,7 +126,7 @@ permissions:
 jobs:
   pge-code-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -100,6 +149,134 @@ jobs:
               console.log('requestReviewers skipped:', e.message);
             }
 
+      # ── Deterministic layer ────────────────────────────────────────────────────
+      # Everything below this comment runs before the agent, so the agent receives
+      # facts instead of deriving them (and therefore varying run to run).
+
+      - name: Collect changed paths
+        id: changed
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(f => f.filename);
+            core.setOutput('changed_paths', paths.join('\n'));
+            core.setOutput('count', String(paths.length));
+            console.log(`Changed files: ${paths.length}`);
+
+      # Reuses the same contract as the Evaluator: .github/scripts/pge-verify.sh,
+      # exit 0 = pass. Absent script → skipped, behaviour unchanged.
+      - name: Run consumer verification script (if present)
+        id: verify-script
+        if: inputs.verify_mode != 'off'
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_PATHS: ${{ steps.changed.outputs.changed_paths }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if [ -f ".github/scripts/pge-verify.sh" ]; then
+            echo "Found .github/scripts/pge-verify.sh — running..."
+            chmod +x .github/scripts/pge-verify.sh
+            if bash .github/scripts/pge-verify.sh; then
+              echo "result=pass" >> "$GITHUB_OUTPUT"
+            else
+              echo "result=fail" >> "$GITHUB_OUTPUT"
+            fi
+            echo "ran=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No .github/scripts/pge-verify.sh found — skipping."
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Reviewing code that does not build wastes turns on findings the build
+      # already reported. Only 'block' mode short-circuits; 'report' just informs.
+      - name: CI gate — stop before review on verification failure
+        if: inputs.verify_mode == 'block' && steps.verify-script.outputs.result == 'fail'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: [
+                  '🔴 **Code Review blocked** — `.github/scripts/pge-verify.sh` exited non-zero.',
+                  '',
+                  'Fix the build/lint/test failures and push again; the review runs automatically.',
+                ].join('\n'),
+              });
+            } catch (e) {
+              core.warning(`Could not post gate comment: ${e.message}`);
+            }
+            core.setFailed('Verification script failed — review skipped.');
+
+      - name: Resolve review rule set
+        id: rules
+        if: inputs.review_rules == 'true'
+        uses: NovoInsurance/ai-workflows-hub/.github/actions/review-rules@v1
+        with:
+          changed_paths: ${{ steps.changed.outputs.changed_paths }}
+
+      # Prior findings make the review incremental: reconcile, then look at what
+      # is new. Without this every push re-derives the checklist from zero and the
+      # findings churn between runs.
+      - name: Load previous review state
+        id: state
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const dir = path.join(process.env.RUNNER_TEMP, 'pge-review');
+            fs.mkdirSync(dir, { recursive: true });
+            const stateFile = path.join(dir, 'previous-state.json');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            const marked = comments.filter(c => c.body && c.body.includes('<!-- pge-review-state'));
+            let state = null;
+            for (let i = marked.length - 1; i >= 0 && !state; i--) {
+              const m = marked[i].body.match(/<!-- pge-review-state\s*([\s\S]*?)-->/);
+              if (!m) continue;
+              try {
+                state = JSON.parse(m[1].trim());
+              } catch (e) {
+                core.warning(`Ignoring unparseable review state comment ${marked[i].id}: ${e.message}`);
+              }
+            }
+
+            const round = marked.length + 1;
+            let openMustFix = 0;
+            if (state && Array.isArray(state.findings)) {
+              openMustFix = state.findings.filter(
+                f => f.severity === 'must-fix' && f.status === 'open'
+              ).length;
+              fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+            }
+
+            core.setOutput('round', String(round));
+            core.setOutput('has_state', state ? 'true' : 'false');
+            core.setOutput('state_file', state ? stateFile : '');
+            core.setOutput('open_must_fix', String(openMustFix));
+            console.log(`Review round ${round}; previous state: ${state ? 'found' : 'none'}; open must-fix: ${openMustFix}`);
 
       - name: Review PR
         uses: NovoInsurance/ai-workflows-hub/.github/actions/claude-bedrock@v1
@@ -132,51 +309,177 @@ jobs:
             3. Every write call MUST target this PR's number.
             4. When fetching the diff, fetch ONLY this PR's diff.
             5. If a tool call would target a different PR/issue/repo, stop and report the attempted call.
+            6. You are a reviewer, not an implementer. Do NOT edit, commit, or push any file in the repository.
+
+            ## Run parameters (already computed — do not re-derive these)
+
+            - Changed files: ${{ steps.changed.outputs.count }}
+            - Review round: **${{ steps.state.outputs.round }}** (soft cap: ${{ inputs.max_review_rounds }})
+            - Previous review state: ${{ steps.state.outputs.has_state == 'true' && steps.state.outputs.state_file || 'none — this is the first review' }}
+            - Previously open must-fix findings: ${{ steps.state.outputs.open_must_fix }}
+            - Verification script: ran=${{ steps.verify-script.outputs.ran || 'false' }}, result=${{ steps.verify-script.outputs.result || 'skipped' }}
+            - Rule set file: ${{ inputs.review_rules == 'true' && steps.rules.outputs.rules_file || 'none — apply general best practices' }}
+            - Rules in scope (${{ steps.rules.outputs.rule_count || '0' }}): ${{ steps.rules.outputs.rule_ids || 'n/a' }}
 
             ## Your task
 
-            **Step 1 — Gather project context (optional, skip if files do not exist)**
-            - If `CLAUDE.md` exists at the repo root, read it to understand the tech stack,
-              architecture pattern, and project conventions. Use this to calibrate your review criteria.
-            - If `.cursor/skills/` exists, read any SKILL files relevant to the changed code.
-            - If neither file exists, infer the tech stack from the PR diff and apply general
-              best practices appropriate to the languages and frameworks you observe.
-            - Do NOT search for these files in subdirectories or retry if they return 404.
+            **Step 1 — Read the rule set**
+            - If a rule set file path is given above, read that absolute path now. It is the
+              **authoritative, closed checklist** for this run.
+            - Do not invent rules outside it. Genuine correctness bugs that no rule covers go in
+              a separate "Other observations" section, and must be actual bugs — not style opinions.
+            - If no rule set file was provided, apply general best practices for the languages you observe.
 
-            **Step 2 — Read the PR diff**
+            **Step 2 — Gather project context (optional, skip if files do not exist)**
+            - If `CLAUDE.md` exists at the repo root, read it to calibrate the rules to this project's
+              stack, architecture, and conventions. Project context calibrates a rule's
+              interpretation; it never removes a rule from the checklist.
+            - Do NOT search for it in subdirectories or retry if it returns 404.
+
+            **Step 3 — Read the PR diff**
             - Fetch the diff for PR #${{ github.event.pull_request.number }} only.
 
-            **Step 3 — Review against these dimensions**
+            **Step 4 — Reconcile previous findings**
+            - Skip this step if no previous review state was provided.
+            - Read the state file. For every finding in it, decide exactly one status:
+              - `fixed` — the diff now satisfies the rule.
+              - `open` — still present. Keep the original `id`, `rule_id`, and `severity`;
+                update `line` if the code moved.
+              - `obsolete` — the code it referred to no longer exists, or the finding was wrong.
+                Say briefly why.
+            - Do NOT silently drop a previous finding. Every one must appear with a status.
 
-            **A. Architecture Compliance**
-            - Layer boundaries respected per the architecture described in CLAUDE.md or Project Context above?
-              (If no architecture is documented, skip the layer boundary check.)
-            - Naming conventions consistent with the patterns observed in the existing codebase?
+            **Step 5 — Evaluate every rule in scope**
+            - For each rule ID, give exactly one verdict: `PASS`, `FAIL`, or `N-A`.
+              Silence is not allowed — an unreported rule ID is a failed review.
+            - `FAIL` requires evidence: `path/to/file.ext:LINE` plus one sentence on what is wrong.
+            - `N-A` requires the rule's own "N-A when" condition to hold. If you are unsure between
+              `N-A` and `PASS`, use `PASS`.
+            - Judge only what this PR changes. Pre-existing problems in untouched code are out of
+              scope unless the diff makes them materially worse.
+            - Use each rule's declared severity. Do not upgrade a should-fix into a blocker.
 
-            **B. Code Quality**
-            - Validation at all external boundaries?
-            - No secrets, credentials, or sensitive data exposed to client or logs?
-            - Error handling: no swallowed errors, no raw stack traces exposed to UI?
+            **Step 6 — Converge**
+            - This is round ${{ steps.state.outputs.round }} of a soft cap of ${{ inputs.max_review_rounds }}.
+            - If the round number is **below** the cap, report new findings normally.
+            - If the round number is **at or above** the cap, do NOT raise any new `should-fix`
+              finding. Re-verify the still-open `must-fix` ones and note that the should-fix
+              checklist is frozen for this PR. The goal is a converging review, not an exhaustive one.
 
-            **C. General Best Practices**
-            - If new patterns or APIs are introduced, flag if documentation should be updated.
-              This is NOT a blocking issue.
+            **Step 7 — Post exactly one comment on PR #${{ github.event.pull_request.number }}**
 
-            Post a concise review comment on PR #${{ github.event.pull_request.number }}.
-            Be specific — reference exact files and line numbers for every finding.
-            Do NOT block PRs for minor style issues; focus on architecture, security, and correctness.
-            If the PR looks good, say so clearly.
+            Use this structure:
 
-            **Output format rules — use these symbols consistently:**
-            - ❌ **Must fix** — correctness bug, security issue, or architecture violation that should block merge
-            - ⚠️ **Should fix** — meaningful quality issue that is not strictly blocking
-            - ✅ **Looks good** — dimension is clean
-
-            End your comment with a summary table:
             ```
-            | Dimension | Finding | Verdict |
-            |-----------|---------|---------|
-            | A — Architecture | ... | ❌ / ⚠️ / ✅ |
-            | B — Code Quality | ... | ❌ / ⚠️ / ✅ |
-            | C — Best Practices | ... | ⚠️ / ✅ |
+            ## 🤖 Code Review — round <N>
+
+            <One-paragraph verdict: is this mergeable, and if not, what is the single most important thing to fix.>
+
+            ### ❌ Must fix
+            - **<RULE-ID>** `path/file.ext:LINE` — <what is wrong and what to do instead>
+            (write "None." if empty)
+
+            ### ⚠️ Should fix
+            - **<RULE-ID>** `path/file.ext:LINE` — <what is wrong and what to do instead>
+            (write "None." if empty)
+
+            ### 🔁 Previous findings
+            - ✅ fixed: <ids>  ·  ❌ still open: <ids>  ·  🗑️ obsolete: <ids>
+            (omit this section entirely on the first round)
+
+            ### 🔍 Other observations
+            (correctness bugs no rule covers; write "None." if empty)
+
+            <details>
+            <summary>Full rule checklist (<passed> PASS · <failed> FAIL · <na> N-A)</summary>
+
+            | Rule | Verdict | Evidence |
+            |------|---------|----------|
+            | ARCH-01 | ✅ PASS | — |
+            | SEC-04 | ❌ FAIL | `src/files.ts:31` — user path joined without base-dir check |
+            | TEST-01 | ➖ N-A | no behavioural change |
+
+            </details>
             ```
+
+            Then append the machine-readable state block as the **last thing in the comment**.
+            The next review run parses it, so it must be a single valid JSON object — no comments,
+            no trailing commas, no prose inside the marker:
+
+            ```
+            <!-- pge-review-state
+            {
+              "round": ${{ steps.state.outputs.round }},
+              "head_sha": "${{ github.event.pull_request.head.sha }}",
+              "findings": [
+                {
+                  "id": "SEC-04@src/files.ts#readUserFile",
+                  "rule_id": "SEC-04",
+                  "file": "src/files.ts",
+                  "line": 31,
+                  "severity": "must-fix",
+                  "status": "open",
+                  "title": "user path joined without base-dir validation"
+                }
+              ]
+            }
+            -->
+            ```
+
+            Rules for the state block:
+            - `id` is the stable fingerprint: `<RULE-ID>@<file>#<enclosing symbol>`. Reuse the
+              previous `id` verbatim for a finding that is still open, so it can be tracked across
+              rounds. Fall back to `#L<line>` when there is no enclosing symbol.
+            - Include every finding from this round plus every previous finding, with
+              `status` of `open`, `fixed`, or `obsolete`.
+            - `severity` is `must-fix` or `should-fix`, taken from the rule.
+            - Do not put the PASS/N-A checklist in the JSON — findings only.
+
+            Be specific and concrete. Do not block a PR over style. If the PR is good, say so plainly.
+
+      # Reads back what the agent published, so the gate is based on the comment
+      # that reviewers actually see rather than on the model's self-report.
+      - name: Convergence gate
+        if: always() && steps.state.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            const marked = comments.filter(c => c.body && c.body.includes('<!-- pge-review-state'));
+            if (marked.length < Number('${{ steps.state.outputs.round }}')) {
+              core.warning('Reviewer did not publish a review state block — nothing to gate on.');
+              return;
+            }
+
+            const m = marked[marked.length - 1].body.match(/<!-- pge-review-state\s*([\s\S]*?)-->/);
+            let state = null;
+            try {
+              state = JSON.parse(m[1].trim());
+            } catch (e) {
+              core.warning(`Latest review state block is not valid JSON: ${e.message}`);
+              return;
+            }
+
+            const findings = Array.isArray(state.findings) ? state.findings : [];
+            const open = findings.filter(f => f.status === 'open');
+            const mustFix = open.filter(f => f.severity === 'must-fix');
+            const shouldFix = open.filter(f => f.severity === 'should-fix');
+
+            await core.summary
+              .addHeading('PGE code review', 3)
+              .addRaw(`Round **${state.round}** · open must-fix: **${mustFix.length}** · open should-fix: **${shouldFix.length}**`)
+              .write();
+
+            if (mustFix.length > 0 && '${{ inputs.fail_on_must_fix }}' === 'true') {
+              core.setFailed(
+                `${mustFix.length} unresolved must-fix finding(s): ` +
+                mustFix.map(f => f.rule_id).join(', ')
+              );
+            }
