@@ -277,6 +277,26 @@ jobs:
       aws_role: "YOUR_ROLE_ARN"
 ```
 
+The reviewer evaluates the PR against a **versioned rule set** the hub ships
+(`.github/actions/review-rules/rules/`), selected from the changed paths — architecture,
+quality, and security always apply; backend, frontend, and testing join when the paths
+match. Every rule ID gets an explicit `PASS` / `FAIL` / `N-A` verdict, which is what keeps
+the review from finding a different subset of problems on each run. Findings are persisted
+in a hidden `<!-- pge-review-state -->` block on the PR, so a later push reconciles the
+previous findings (`fixed` / `open` / `obsolete`) instead of reviewing from scratch.
+
+None of this needs configuration. Optional inputs, all defaulting to advisory behaviour:
+
+| Input | Default | Effect |
+|-------|---------|--------|
+| `review_rules` | `'true'` | Set to `'false'` for the previous free-form review |
+| `verify_mode` | `'report'` | `'block'` skips the review and fails when `.github/scripts/pge-verify.sh` exits non-zero; `'off'` never runs it |
+| `fail_on_must_fix` | `'false'` | `'true'` fails the check while must-fix findings remain (pair with branch protection to gate merges) |
+| `max_review_rounds` | `'3'` | From this round on, no new should-fix findings — only open must-fix ones are re-verified |
+
+To add stricter project rules on top of the baseline, drop Markdown files in
+`.github/review-rules/` in your own repo using the same `### PRJ-01 — title` heading format.
+
 **`pge-decompose.yml`** — Split a large issue into sub-issues
 
 ```yaml

@@ -1,0 +1,36 @@
+{
+  "$comment": [
+    "Rule set selection is deterministic: `match` is an extended regex (grep -E)",
+    "tested against the newline-separated list of changed paths. `always` loads",
+    "unconditionally. Overlap is expected and fine — a .ts file under services/",
+    "legitimately pulls in both the backend and frontend sets.",
+    "Rule IDs must stay stable across versions: never renumber an existing rule.",
+    "Retire a rule by deleting it and leaving its number unused."
+  ],
+  "rule_sets": [
+    {
+      "file": "architecture.md",
+      "match": "always"
+    },
+    {
+      "file": "quality.md",
+      "match": "always"
+    },
+    {
+      "file": "security.md",
+      "match": "always"
+    },
+    {
+      "file": "backend.md",
+      "match": "(^|/)(controllers?|services?|repositor(y|ies)|handlers?|routes?|middlewares?|migrations?|dao|usecases?|api|server|backend)/|\\.(java|kt|go|py|rb|php|cs|sql)$"
+    },
+    {
+      "file": "frontend.md",
+      "match": "\\.(tsx?|jsx?|vue|svelte|css|scss|less|html)$|(^|/)(components?|pages?|views?|screens?|hooks?|stores?|styles?)/"
+    },
+    {
+      "file": "testing.md",
+      "match": "(^|/)(tests?|__tests__|spec|specs)/|\\.(test|spec)\\.[a-zA-Z]+$|Test\\.(java|kt)$|_test\\.go$|(^|/)test_[^/]+\\.py$"
+    }
+  ]
+}

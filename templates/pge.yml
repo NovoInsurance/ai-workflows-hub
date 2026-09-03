@@ -107,7 +107,7 @@ jobs:
     uses: NovoInsurance/ai-workflows-hub/.github/workflows/pge-code-review.yml@v1
     with:
       aws_role: "arn:aws:iam::ACCOUNT_ID:role/YOUR_ROLE_NAME"
-      # max_turns: '100'   # optional override, defaults to '60' if omitted
+      # max_turns: '150'   # optional override, defaults to '100' if omitted
       project_context: |
         Replace this block with your project description.
         - Language / platform: ...

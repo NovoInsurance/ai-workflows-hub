@@ -277,6 +277,24 @@ jobs:
       aws_role: "YOUR_ROLE_ARN"
 ```
 
+审查基于 hub 内置的**版本化规则表**（`.github/actions/review-rules/rules/`）进行，加载哪几组由
+改动路径决定：架构、质量、安全始终生效，后端、前端、测试在路径匹配时加入。每条规则 ID 都必须给出
+明确的 `PASS` / `FAIL` / `N-A` 结论——这正是让每次审查不再只命中问题的随机子集的关键。审查结论会以
+隐藏的 `<!-- pge-review-state -->` 块保存在 PR 上，下次 push 时先逐条核对历史结论
+（`fixed` / `open` / `obsolete`），而不是从零重新审一遍。
+
+以上都无需配置。可选输入，默认均为"只提示不拦截"：
+
+| 输入 | 默认值 | 作用 |
+|------|--------|------|
+| `review_rules` | `'true'` | 设为 `'false'` 回退到原先的自由式审查 |
+| `verify_mode` | `'report'` | `'block'` 会在 `.github/scripts/pge-verify.sh` 非零退出时跳过审查并失败；`'off'` 完全不运行 |
+| `fail_on_must_fix` | `'false'` | `'true'` 时只要仍有 must-fix 结论就让检查失败（配合分支保护即可拦截合并） |
+| `max_review_rounds` | `'3'` | 达到该轮次后不再提出新的 should-fix，只复查未修的 must-fix |
+
+若要在基线之上追加更严的项目规则，在自己 repo 的 `.github/review-rules/` 下放 Markdown 文件，
+沿用 `### PRJ-01 — 标题` 的标题格式即可。
+
 **`pge-decompose.yml`** — 将大 Issue 拆分为子 Issue
 
 ```yaml
