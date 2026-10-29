@@ -27,10 +27,10 @@ on:
         type: string
         default: ''
       model:
-        description: 'Bedrock model ID (defaults to claude-sonnet-4-6)'
+        description: 'Bedrock model ID (defaults to claude-sonnet-5-5)'
         required: false
         type: string
-        default: 'us.anthropic.claude-sonnet-4-6'
+        default: 'us.anthropic.claude-sonnet-5-5'
       aws_role:
         description: 'IAM Role ARN for Bedrock access'
         required: true

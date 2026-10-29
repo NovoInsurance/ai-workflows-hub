@@ -33,7 +33,7 @@ on:
         description: 'Bedrock model ID'
         required: false
         type: string
-        default: 'us.anthropic.claude-sonnet-4-6'
+        default: 'us.anthropic.claude-sonnet-5-5'
       max_turns:
         description: >
           Maximum number of agentic turns for the review. Default (60) covers

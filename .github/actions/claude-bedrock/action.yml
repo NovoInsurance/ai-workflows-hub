@@ -55,13 +55,17 @@ inputs:
   model:
     description: >
       Bedrock cross-region inference profile ID.
-      Defaults to us.anthropic.claude-sonnet-4-6.
+      Defaults to us.anthropic.claude-sonnet-5-5.
     required: false
-    default: 'us.anthropic.claude-sonnet-4-6'
+    default: 'us.anthropic.claude-sonnet-5-5'
 
 # ─── Pinned versions ───────────────────────────────────────────────────────────
-# claude-code-action: v1.0.101
-# default model:     us.anthropic.claude-sonnet-4-6 (cross-region inference profile)
+# claude-code-action: v1.0.264 (bundles Claude Code 2.1.312). Bumped from v1.0.101
+#                     together with the Sonnet 5.5 default: Claude Code supports
+#                     Sonnet 5.5 only from 2.1.284 (action v1.0.247+), and v1.0.101
+#                     predates even Sonnet 5. Input interface diffed: every input
+#                     used below is unchanged; only additive inputs in between.
+# default model:     us.anthropic.claude-sonnet-5-5 (cross-region inference profile)
 # Figma MCP:         Official server at https://mcp.figma.com/v1/sse
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -89,7 +93,7 @@ runs:
           > "${RUNNER_TEMP}/figma-mcp-config.json"
 
     - name: Invoke Claude
-      uses: anthropics/claude-code-action@v1.0.101
+      uses: anthropics/claude-code-action@v1.0.264
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         MCP_TIMEOUT: '60000'
